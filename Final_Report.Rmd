@@ -1,0 +1,97 @@
+---
+title: "Final_Report"
+author: "Cristian Sastre"
+date: "12/09/2021"
+output: 
+        html_document:
+         keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+The final report corresponding to the practical automatic learning course is shown below. In this project, data collected from accelerometers placed on 4 body parts of 6 participants was used in order to predict the way in which they performed the exercise. For the prediction, a model was trained (**Random forest**), which is then used to predict 20 cases obtained from the test set. 
+
+
+# Libraries and Data
+
+Loading required libraries and proposed data:
+```{r results='hide', message=FALSE}
+library(ggplot2)
+library(kernlab)
+library(rattle)
+library(corrplot)
+library(caret)
+
+set.seed(1234)
+```
+
+```{r}
+train_data <- read.csv("./pml-training.csv")
+test_data <- read.csv("./pml-testing.csv")
+dim(train_data)
+dim(test_data)
+```
+
+
+# Cleaning the Data
+
+Eliminating N / A variables and irrelevant variables:
+```{r}
+train_data <- train_data[,colMeans(is.na(train_data)) < .9]
+train_data <- train_data[,-c(1:7)]
+```
+
+Removing near zero variance variables:
+```{r nzv}
+nvz <- nearZeroVar(train_data)
+train_data <- train_data[,-nvz]
+```
+
+Division of the validation and training set:
+```{r}
+inTrain <- createDataPartition(y=train_data$classe, p=0.7, list=F)
+train <- train_data[inTrain,]
+valid <- train_data[-inTrain,]
+```
+
+
+# Correlation overview
+
+Correlation matrix of variables in training set:
+```{r}
+corrPlot <- cor(train[, -length(names(train))])
+corrplot(corrPlot, method="color")
+```
+
+
+# Train and Testing the Model
+
+Training process for the random forest and results obtained in the confusion matrix:
+```{r, cache=TRUE}
+cont <- trainControl(method="cv", number=3, verboseIter=F) # 3-fold cross validation.
+random_forest_model <- train(classe~., data=train, method="rf", trControl = cont, tuneLength = 5)
+random_forest_prediction <- predict(random_forest_model, valid)
+conf_matrix <- confusionMatrix(random_forest_prediction, factor(valid$classe))
+conf_matrix
+```
+
+## Accuracy & Error
+
+Summary of results, precision and error of the model: 
+```{r, echo=FALSE}
+accuracy <- round(c(conf_matrix$overall[1]),3) #accuracy
+error <- 1 - accuracy #out of sample error
+data.frame(accuracy = accuracy, error = error, row.names = "RF")
+```
+
+
+# Predictions on Test Set
+
+Model prediction test, using the 20 cases given in the test set:
+```{r}
+print(predict(random_forest_model, test_data))
+```
